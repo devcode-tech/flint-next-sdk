@@ -1,0 +1,43 @@
+# Source files (keep these out of npm package)
+src/
+public/
+.next/
+node_modules/
+
+# Development files
+*.log
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+coverage/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Build artifacts (except dist)
+.next/
+out/
+
+# Config files
+tsconfig.json
+tsconfig.sdk.json
+rollup.config.js
+next.config.js
+tailwind.config.ts
+postcss.config.js
+eslint.config.mjs
+
+# Git
+.git/
+.gitignore
+
+# Only include dist and README_SDK.md

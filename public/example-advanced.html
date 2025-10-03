@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flint Form - Custom Submit Handler</title>
+</head>
+<body class="bg-gray-50 p-8">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-4xl font-bold mb-4 text-center text-gray-900">Custom Submit Handler</h1>
+    <p class="text-center text-gray-600 mb-8">Example with custom API integration</p>
+    
+    <div id="my-custom-form"></div>
+  </div>
+
+  <script src="./dist/flint-form.js"></script>
+  <script>
+    const form = new FlintForm();
+    
+    form.init({
+      containerId: 'my-custom-form',
+      onSubmit: async (data) => {
+        console.log('Form submitted:', data);
+        
+        try {
+          const response = await fetch('https://your-api.com/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          
+          if (response.ok) {
+            alert('Form submitted successfully!');
+          }
+        } catch (error) {
+          alert('Submission failed: ' + error.message);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationDir": "./dist",
+    "outDir": "./dist",
+    "module": "ESNext",
+    "target": "ES2015",
+    "lib": ["ES2015", "DOM", "DOM.Iterable"],
+    "jsx": "react",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false
+  },
+  "include": [
+    "src/lib/**/*",
+    "src/components/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/app"
+  ]
+}

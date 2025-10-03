@@ -1,0 +1,10 @@
+import { type ClassValue } from "clsx";
+import { FormFieldStyle } from "@/lib/types";
+export declare function cn(...inputs: ClassValue[]): string;
+export declare function applyInlineStyles(style: FormFieldStyle['input'] | FormFieldStyle['label'] | Record<string, any>): React.CSSProperties;
+export declare function formatFileSize(bytes: number): string;
+export declare function isValidFileType(fileName: string, allowedTypes: string[]): boolean;
+export declare function validateAge(dateString: string, minAge: number): boolean;
+export declare function validateCanadianPostalCode(postalCode: string): boolean;
+export declare function formatDate(date: string, format: string): string;
+export declare function parseFormData(formData: Record<string, any>): Record<string, any>;

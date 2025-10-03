@@ -1,0 +1,77 @@
+{
+  "name": "flint-form",
+  "version": "1.0.0",
+  "description": "A simple, powerful form SDK that works anywhere - just add a script tag!",
+  "main": "dist/flint-form.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build:sdk": "rollup -c && node scripts/generate-sri.js",
+    "build:watch": "rollup -c -w",
+    "copy:dist": "xcopy /E /I /Y dist public\\dist",
+    "serve:example": "npm run build:sdk && npm run copy:dist && npx http-server public -p 3002 -o /example.html",
+    "security:audit": "npm audit --audit-level=moderate",
+    "security:check": "npm run security:audit && npm run type-check",
+    "prepublishOnly": "npm run security:check && npm run build:sdk",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "analyze": "rollup -c --environment ANALYZE"
+  },
+  "keywords": [
+    "forms",
+    "dynamic-forms",
+    "flint-form",
+    "form-sdk",
+    "react",
+    "typescript",
+    "form-builder",
+    "secure-forms"
+  ],
+  "author": "Flint Team",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@hookform/resolvers": "^3.3.2",
+    "@radix-ui/react-checkbox": "^1.0.4",
+    "@radix-ui/react-icons": "^1.3.0",
+    "@radix-ui/react-select": "^2.0.0",
+    "clsx": "^2.0.0",
+    "next": "^14.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "react-hook-form": "^7.48.2",
+    "tailwind-merge": "^2.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@babel/preset-react": "^7.27.1",
+    "@babel/preset-typescript": "^7.27.1",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-replace": "^6.0.2",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "@types/node": "^20.8.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.51.0",
+    "eslint-config-next": "^14.0.0",
+    "postcss": "^8.5.6",
+    "rollup": "^4.52.4",
+    "rollup-plugin-postcss": "^4.0.2",
+    "tailwindcss": "^3.3.5",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  }
+}
