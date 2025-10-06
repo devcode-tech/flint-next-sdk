@@ -42,21 +42,28 @@ export interface FormFieldLink {
     url: string;
 }
 export type FormFieldType = 'text' | 'email' | 'date' | 'postal' | 'file' | 'checkbox' | 'dropdown' | 'terms';
+export interface ConditionalLogic {
+    dependsOn: string;
+    condition: 'checked' | 'unchecked' | 'equals' | 'notEquals' | 'contains' | 'greaterThan' | 'lessThan';
+    value?: any;
+}
 export interface FormField {
     id: string;
-    name: string;
     type: FormFieldType;
+    name: string;
     label: string;
-    placeholder: string;
-    required: boolean;
-    validation: FormFieldValidation;
-    width: string;
-    style: FormFieldStyle;
-    dateFormat?: string;
-    options?: FormFieldOption[];
-    mode?: 'checkbox' | 'text';
-    content?: string;
-    links?: FormFieldLink[];
+    placeholder?: string;
+    required?: boolean;
+    validation?: FormFieldValidation;
+    options?: Array<{
+        label: string;
+        value: string;
+    }>;
+    style?: FormFieldStyle;
+    width?: 'w-full' | 'w-1/2' | 'w-1/3' | 'w-2/3';
+    checkboxText?: string;
+    checkboxAlignment?: 'left' | 'right';
+    conditionalLogic?: ConditionalLogic;
 }
 export interface FormSubmitButton {
     text: string;

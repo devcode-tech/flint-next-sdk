@@ -14,8 +14,43 @@ import {
   FileField, 
   CheckboxField, 
   DropdownField, 
-  TermsField 
+  TermsField,
+  RadioField,
+  TextareaField,
+  NumberField,
+  TelephoneField,
+  URLField,
+  TimeField,
+  ColorField,
+  RangeField,
+  SelectMultipleField
 } from "@/components/fields";
+
+// Helper function to evaluate conditional logic
+function evaluateCondition(
+  condition: string,
+  dependsOnValue: any,
+  targetValue: any
+): boolean {
+  switch (condition) {
+    case 'checked':
+      return dependsOnValue === true || dependsOnValue === 'true';
+    case 'unchecked':
+      return dependsOnValue === false || dependsOnValue === 'false' || !dependsOnValue;
+    case 'equals':
+      return dependsOnValue === targetValue;
+    case 'notEquals':
+      return dependsOnValue !== targetValue;
+    case 'contains':
+      return String(dependsOnValue || '').includes(String(targetValue));
+    case 'greaterThan':
+      return Number(dependsOnValue) > Number(targetValue);
+    case 'lessThan':
+      return Number(dependsOnValue) < Number(targetValue);
+    default:
+      return true;
+  }
+}
 
 interface DynamicFormProps {
   schema: FormSchema;
@@ -83,6 +118,24 @@ function FormField({ field, register, setValue, watch, errors, trigger, isSubmit
       return <DropdownField {...fieldProps} />;
     case "terms":
       return <TermsField {...fieldProps} />;
+    case "radio":
+      return <RadioField {...fieldProps} />;
+    case "textarea":
+      return <TextareaField {...fieldProps} />;
+    case "number":
+      return <NumberField {...fieldProps} />;
+    case "telephone":
+      return <TelephoneField {...fieldProps} />;
+    case "url":
+      return <URLField {...fieldProps} />;
+    case "time":
+      return <TimeField {...fieldProps} />;
+    case "color":
+      return <ColorField {...fieldProps} />;
+    case "range":
+      return <RangeField {...fieldProps} />;
+    case "select-multiple":
+      return <SelectMultipleField {...fieldProps} />;
     default:
       return <TextField {...fieldProps} />;
   }
@@ -122,6 +175,32 @@ export function DynamicForm({
     reValidateMode: "onChange",
     shouldFocusError: true
   });
+
+  // Watch all form values for conditional logic evaluation
+  const formValues = watch();
+
+  // Filter fields based on conditional logic
+  const visibleFields = React.useMemo(() => {
+    return schema.fields.filter((field) => {
+      if (!field.conditionalLogic) {
+        return true; // No conditional logic, always visible
+      }
+
+      const { dependsOn, condition, value } = field.conditionalLogic;
+      
+      // Find the field this depends on
+      const dependsOnField = schema.fields.find(f => f.id === dependsOn);
+      if (!dependsOnField) {
+        return true; // If dependency field not found, show the field
+      }
+
+      // Get the value of the dependency field
+      const dependsOnValue = formValues[dependsOnField.name];
+
+      // Evaluate the condition
+      return evaluateCondition(condition, dependsOnValue, value);
+    });
+  }, [schema.fields, formValues]);
 
   const containerStyles = applyInlineStyles({
     'background-color': schema.design['background-color'],
@@ -191,7 +270,7 @@ export function DynamicForm({
 
         {/* Form Fields */}
         <div className="flex flex-wrap -mx-2">
-          {schema.fields.map((field) => {
+          {visibleFields.map((field) => {
             // Skip fields without names (like text-only terms)
             if (!field.name || !field.name.trim()) {
               return (

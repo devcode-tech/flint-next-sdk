@@ -276,6 +276,11 @@ const formSchema: FormSchema = {
         "requiredMessage": "Business Name is required"
       },
       "width": "w-1/2",
+      "conditionalLogic": {
+        "dependsOn": 'field_13',
+         "condition": 'checked', 
+         "value": ''
+      },
       "style": {
         "label": {
           "color": "#111827",
@@ -307,6 +312,12 @@ const formSchema: FormSchema = {
         "requiredMessage": "Trade Type is required"
       },
       "width": "w-1/2",
+      "conditionalLogic": 
+      {
+        "dependsOn": 'field_13',
+         "condition": 'checked', 
+         "value": ''
+      },
       "style": {
         "label": {
           "color": "#111827",
