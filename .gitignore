@@ -13,6 +13,7 @@
 # Production
 /build
 /dist
+/public/dist
 .rollup.cache
 
 # Misc
