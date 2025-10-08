@@ -1,28 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta name="referrer" content="strict-origin-when-cross-origin">
-  <title>Flint Form - Secure Integration</title>
-  
-  <!-- Temporarily add Tailwind CDN for debugging -->
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 p-8">
-  <div class="max-w-6xl mx-auto">
-    <h1 class="text-4xl font-bold mb-4 text-center text-gray-900">Flint Form</h1>
-    <p class="text-center text-gray-600 mb-8">
-      Secure, optimized, and production-ready form SDK
-    </p>
-    
-    <!-- Form appears here automatically! -->
-    <div id="flint-form-root"></div>
-  </div>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta http-equiv="X-Content-Type-Options" content="nosniff" />
+		<meta name="referrer" content="strict-origin-when-cross-origin" />
+		<title>Flint Form - Secure Integration</title>
 
-  <!-- Include Flint Form SDK -->
-  <script src="./dist/flint-form.js" 
-          crossorigin="anonymous"></script>
-</body>
+		<!-- Temporarily add Tailwind CDN for debugging -->
+	</head>
+	<body class="bg-gray-50 p-8">
+		<div class="max-w-6xl mx-auto">
+			<h1 class="text-4xl font-bold mb-4 text-center text-gray-900">
+				Flint Form - Dynamic Schema
+			</h1>
+			<p class="text-center text-gray-600 mb-8">
+				Secure, optimized, and production-ready form SDK with dynamic schema
+				loading and auto-submission
+			</p>
+
+			<!-- Form appears here automatically with data-form-id attribute -->
+			<!-- Auto-submits to Supabase by default when formId is provided -->
+			<div
+				id="flint-form-root"
+				data-form-id="B25DGW"
+				data-auto-submit="true"
+				data-capture-ip="false"
+				data-show-modal="false"
+			></div>
+		</div>
+
+		<!-- Configure Supabase credentials BEFORE loading the SDK -->
+		<script>
+			window.FLINT_FORM_CONFIG = {
+				SUPABASE_URL: 'https://azgckzuuayxdwotufiah.supabase.co',
+				SUPABASE_ANON_KEY:
+					'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6Z2NrenV1YXl4ZHdvdHVmaWFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyMzA1ODIsImV4cCI6MjA2NDgwNjU4Mn0.cYAbvGBTe1lXdQALFqRhsMnPdWK7gEU3j9WpXCKSS7g',
+				DEBUG: true, // Enable debug logging
+			};
+		</script>
+
+		<!-- Include Flint Form SDK -->
+		<script src="./dist/flint-form.js" crossorigin="anonymous"></script>
+	</body>
 </html>

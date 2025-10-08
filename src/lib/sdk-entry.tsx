@@ -1,207 +1,372 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { DynamicForm } from '@/components/DynamicForm';
-import type { FormData } from '@/lib/types';
+import { Modal } from '@/components/Modal';
+import type { FormData, FormSchema } from '@/lib/types';
 import formSchema from '@/app/page-schema';
-import { validateFormData, rateLimiter, sanitizeInput } from './security'
+import { validateFormData, rateLimiter, sanitizeInput } from './security';
+import { fetchFormSchema } from './schema-service';
+import { submitFormToSupabase, getClientIP } from './submission-service';
 
 // Import bundled styles
 import './sdk-styles.css';
 
 interface FlintFormConfig {
-  containerId?: string;
-  onSubmit?: (data: FormData) => void | Promise<void>;
-  onError?: (error: Error) => void;
-  enableRateLimiting?: boolean;
-  maxRetries?: number;
+	containerId?: string;
+	formId?: string; // form_id to fetch schema from Supabase
+	schema?: FormSchema; // Optional direct schema override
+	onSubmit?: (data: FormData) => void | Promise<void>; // Custom submit handler
+	onError?: (error: Error) => void;
+	onSchemaLoad?: (schema: FormSchema) => void;
+	onSubmitSuccess?: (submissionId?: string) => void; // NEW: Called after successful submission
+	enableRateLimiting?: boolean;
+	maxRetries?: number;
+	autoSubmitToSupabase?: boolean; // NEW: Auto-submit to Supabase (default: true if formId provided)
+	captureIP?: boolean; // NEW: Capture IP address for submissions (default: false)
 }
 
 class FlintForm {
-  private root: ReactDOM.Root | null = null;
-  private container: HTMLElement | null = null;
-  private config: FlintFormConfig | null = null;
-  private retryCount: number = 0;
+	private root: ReactDOM.Root | null = null;
+	private container: HTMLElement | null = null;
+	private config: FlintFormConfig | null = null;
+	private retryCount: number = 0;
+	private loadedSchema: FormSchema | null = null;
 
-  init(config?: FlintFormConfig) {
-    const { 
-      containerId = 'flint-form-root', 
-      onSubmit, 
-      onError,
-      enableRateLimiting = true,
-      maxRetries = 3
-    } = config || {};
+	async init(config?: FlintFormConfig) {
+		const {
+			containerId = 'flint-form-root',
+			formId,
+			schema,
+			onSubmit,
+			onError,
+			onSchemaLoad,
+			onSubmitSuccess,
+			enableRateLimiting = true,
+			maxRetries = 3,
+			autoSubmitToSupabase = formId ? true : false, // Auto-enable if formId provided
+			captureIP = false,
+		} = config || {};
 
-    this.config = { 
-      containerId, 
-      onSubmit, 
-      onError, 
-      enableRateLimiting, 
-      maxRetries 
-    };
+		this.config = {
+			containerId,
+			formId,
+			schema,
+			onSubmit,
+			onError,
+			onSchemaLoad,
+			onSubmitSuccess,
+			enableRateLimiting,
+			maxRetries,
+			autoSubmitToSupabase,
+			captureIP,
+		};
 
-    this.container = document.getElementById(containerId);
-    
-    if (!this.container) {
-      const error = new Error(`Container with id "${containerId}" not found`);
-      this.handleError(error, onError);
-      return;
-    }
+		this.container = document.getElementById(containerId);
 
-    // Secure the container
-    this.secureContainer();
+		if (!this.container) {
+			const error = new Error(`Container with id "${containerId}" not found`);
+			this.handleError(error, onError);
+			return;
+		}
 
-    const secureOnSubmit = async (data: FormData) => {
-      try {
-        // Security validation
-        if (!validateFormData(data)) {
-          throw new Error('Invalid form data detected');
+		// Secure the container
+		this.secureContainer();
+
+		// Show loading state
+		this.showLoading();
+
+		try {
+			// Determine which schema to use
+			let schemaToUse: FormSchema;
+
+			if (schema) {
+				// Use provided schema directly
+				schemaToUse = schema;
+			} else if (formId) {
+				// Fetch schema from Supabase
+				const fetchedSchema = await fetchFormSchema(formId);
+				if (!fetchedSchema) {
+					throw new Error(`Failed to load form schema for form_id: ${formId}`);
+				}
+				schemaToUse = fetchedSchema;
+			} else {
+				// Fallback to default schema
+				schemaToUse = formSchema;
+			}
+
+			this.loadedSchema = schemaToUse;
+
+			// Notify schema loaded
+			if (onSchemaLoad) {
+				onSchemaLoad(schemaToUse);
+			}
+
+			// Check for modal attribute
+			const showModal = this.container.dataset.showModal === 'true';
+
+			// Render the form
+			await this.renderForm(schemaToUse, showModal);
+		} catch (error) {
+			this.handleError(error as Error, onError);
+			this.showError('Failed to load form. Please try again.');
+		}
+	}
+
+	private async renderForm(schema: FormSchema, showModal: boolean) {
+		const {
+			onSubmit,
+			enableRateLimiting,
+			containerId,
+			autoSubmitToSupabase,
+			formId,
+			captureIP,
+			onSubmitSuccess,
+		} = this.config || {};
+
+		const secureOnSubmit = async (data: FormData) => {
+			try {
+				// Security validation
+				if (!validateFormData(data)) {
+					throw new Error('Invalid form data detected');
+				}
+
+				// Rate limiting
+				if (
+					enableRateLimiting &&
+					!rateLimiter.isAllowed(containerId || 'flint-form-root')
+				) {
+					throw new Error(
+						'Too many submission attempts. Please wait before trying again.'
+					);
+				}
+
+				// Sanitize string inputs
+				const sanitizedData = this.sanitizeFormData(data);
+
+				// Handle submission based on configuration
+				if (autoSubmitToSupabase && formId) {
+					// Auto-submit to Supabase
+					let ipAddress: string | null = null;
+					if (captureIP) {
+						ipAddress = await getClientIP();
+					}
+
+					const result = await submitFormToSupabase(
+						formId,
+						sanitizedData,
+						ipAddress || undefined
+					);
+
+					if (!result.success) {
+						throw new Error(result.error || 'Failed to submit form');
+					}
+
+					// Call success callback
+					if (onSubmitSuccess) {
+						onSubmitSuccess(result.submissionId);
+					}
+
+					// Also call custom onSubmit if provided (for additional processing)
+					if (onSubmit) {
+						await onSubmit(sanitizedData);
+					}
+
+					alert('Form submitted successfully!');
+				} else if (onSubmit) {
+					// Use custom submit handler
+					console.log('✅ Using custom onSubmit handler');
+					await onSubmit(sanitizedData);
+					if (onSubmitSuccess) {
+						onSubmitSuccess();
+					}
+				} else {
+					// Default behavior
+					alert('Form submitted successfully!');
+				}
+
+				rateLimiter.reset(containerId || 'flint-form-root');
+				this.retryCount = 0;
+			} catch (error) {
+				console.error('❌ Error in secureOnSubmit:', error);
+				this.handleSubmissionError(error as Error, data);
+			}
+		};
+
+		if (!this.container) return;
+
+		this.root = ReactDOM.createRoot(this.container);
+
+		const formElement = React.createElement(DynamicForm, {
+			schema: schema,
+			onSubmit: secureOnSubmit,
+		});
+
+		if (showModal) {
+			this.root.render(
+				React.createElement(Modal, {
+					onClose: () => this.unmount(),
+					children: formElement,
+				})
+			);
+		} else {
+			this.root.render(formElement);
+		}
+	}
+
+	private showLoading() {
+		if (!this.container) return;
+		this.container.innerHTML = `
+      <div style="display: flex; justify-content: center; align-items: center; min-height: 200px;">
+        <div style="text-align: center;">
+          <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+          <p style="margin-top: 16px; color: #666;">Loading form...</p>
+        </div>
+      </div>
+      <style>
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
+      </style>
+    `;
+	}
 
-        // Rate limiting
-        if (enableRateLimiting && !rateLimiter.isAllowed(containerId)) {
-          throw new Error('Too many submission attempts. Please wait before trying again.');
-        }
+	private showError(message: string) {
+		if (!this.container) return;
+		this.container.innerHTML = `
+      <div style="padding: 20px; background-color: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;">
+        <strong>Error:</strong> ${message}
+      </div>
+    `;
+	}
 
-        // Sanitize string inputs
-        const sanitizedData = this.sanitizeFormData(data);
+	private secureContainer() {
+		if (!this.container) return;
 
-        // Call user's onSubmit or default handler
-        if (onSubmit) {
-          await onSubmit(sanitizedData);
-          rateLimiter.reset(containerId); // Reset on success
-        } else {
-          console.log('Form submitted:', sanitizedData);
-          alert('Form submitted successfully!');
-        }
+		// Prevent clickjacking
+		this.container.style.position = 'relative';
+		this.container.style.zIndex = '1';
 
-        this.retryCount = 0; // Reset retry count on success
-      } catch (error) {
-        this.handleSubmissionError(error as Error, data);
-      }
-    };
+		// Add security attributes
+		this.container.setAttribute('data-flint-form', 'true');
+		this.container.setAttribute('role', 'form');
+		this.container.setAttribute('aria-label', 'Dynamic Form');
+	}
 
-    try {
-      this.root = ReactDOM.createRoot(this.container);
-      
-      this.root.render(
-        React.createElement(DynamicForm, {
-          schema: formSchema,
-          onSubmit: secureOnSubmit
-        })
-      );
-    } catch (error) {
-      this.handleError(error as Error, onError);
-    }
-  }
+	private sanitizeFormData(data: FormData): FormData {
+		const sanitized: FormData = {};
 
-  private secureContainer() {
-    if (!this.container) return;
+		for (const [key, value] of Object.entries(data)) {
+			if (typeof value === 'string') {
+				sanitized[key] = sanitizeInput(value);
+			} else if (Array.isArray(value)) {
+				sanitized[key] = value.map(v =>
+					typeof v === 'string' ? sanitizeInput(v) : v
+				);
+			} else {
+				sanitized[key] = value;
+			}
+		}
 
-    // Prevent clickjacking
-    this.container.style.position = 'relative';
-    this.container.style.zIndex = '1';
-    
-    // Add security attributes
-    this.container.setAttribute('data-flint-form', 'true');
-    this.container.setAttribute('role', 'form');
-    this.container.setAttribute('aria-label', 'Dynamic Form');
-  }
+		return sanitized;
+	}
 
-  private sanitizeFormData(data: FormData): FormData {
-    const sanitized: FormData = {};
-    
-    for (const [key, value] of Object.entries(data)) {
-      if (typeof value === 'string') {
-        sanitized[key] = sanitizeInput(value);
-      } else if (Array.isArray(value)) {
-        sanitized[key] = value.map(v => 
-          typeof v === 'string' ? sanitizeInput(v) : v
-        );
-      } else {
-        sanitized[key] = value;
-      }
-    }
-    
-    return sanitized;
-  }
+	private handleSubmissionError(error: Error, originalData: FormData) {
+		const { maxRetries = 3, onError } = this.config || {};
 
-  private handleSubmissionError(error: Error, originalData: FormData) {
-    const { maxRetries = 3, onError } = this.config || {};
+		if (this.retryCount < maxRetries && error.message.includes('network')) {
+			this.retryCount++;
+			console.warn(`Retrying submission (${this.retryCount}/${maxRetries})...`);
 
-    if (this.retryCount < maxRetries && error.message.includes('network')) {
-      this.retryCount++;
-      console.warn(`Retrying submission (${this.retryCount}/${maxRetries})...`);
-      
-      setTimeout(() => {
-        if (this.config?.onSubmit) {
-          this.config.onSubmit(originalData);
-        }
-      }, 1000 * this.retryCount); // Exponential backoff
-    } else {
-      this.handleError(error, onError);
-      this.retryCount = 0;
-    }
-  }
+			setTimeout(() => {
+				if (this.config?.onSubmit) {
+					this.config.onSubmit(originalData);
+				}
+			}, 1000 * this.retryCount);
+		} else {
+			this.handleError(error, onError);
+			this.retryCount = 0;
+		}
+	}
 
-  private handleError(error: Error, onError?: (error: Error) => void) {
-    // Never expose sensitive error details to users
-    const safeError = new Error('An error occurred. Please try again.');
-    
-    // Log full error for debugging (only in development)
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('Flint Form Error:', error);
-    }
+	unmount() {
+		if (this.root) {
+			this.root.unmount();
+			this.root = null;
+		}
+	}
 
-    if (onError) {
-      onError(safeError);
-    } else {
-      console.error('Flint Form:', safeError.message);
-    }
-  }
+	private handleError(error: Error, onError?: (error: Error) => void) {
+		const safeError = new Error('An error occurred. Please try again.');
 
-  destroy() {
-    if (this.root) {
-      this.root.unmount();
-      this.root = null;
-      this.container = null;
-      this.config = null;
-      this.retryCount = 0;
-    }
-  }
+		// Always log in development (no process.env check for browser)
+		if (
+			typeof window !== 'undefined' &&
+			(window as any).FLINT_FORM_CONFIG?.DEBUG
+		) {
+			console.error('Flint Form Error:', error);
+		}
 
-  // Get SDK version
-  static getVersion(): string {
-    return '1.0.0';
-  }
+		if (onError) {
+			onError(safeError);
+		} else {
+			console.error('Flint Form:', safeError.message);
+		}
+	}
 
-  // Check if SDK is initialized
-  isInitialized(): boolean {
-    return this.root !== null;
-  }
+	destroy() {
+		if (this.root) {
+			this.root.unmount();
+			this.root = null;
+			this.container = null;
+			this.config = null;
+			this.retryCount = 0;
+			this.loadedSchema = null;
+		}
+	}
+
+	getLoadedSchema(): FormSchema | null {
+		return this.loadedSchema;
+	}
+
+	static getVersion(): string {
+		return '1.0.0';
+	}
+
+	isInitialized(): boolean {
+		return this.root !== null;
+	}
 }
 
 // Auto-initialize with security checks
 if (typeof window !== 'undefined') {
-  (window as any).FlintForm = FlintForm;
-  
-  const autoInit = () => {
-    // Verify we're in a secure context (HTTPS or localhost)
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-      console.warn('Flint Form: For security, please use HTTPS in production');
-    }
+	(window as any).FlintForm = FlintForm;
 
-    const container = document.getElementById('flint-form-root');
-    if (container) {
-      const form = new FlintForm();
-      form.init();
-    }
-  };
+	const autoInit = async () => {
+		if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+			console.warn('Flint Form: For security, please use HTTPS in production');
+		}
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', autoInit);
-  } else {
-    autoInit();
-  }
+		const container = document.getElementById('flint-form-root');
+		if (container) {
+			const formId = container.getAttribute('data-form-id');
+			const autoSubmit = container.getAttribute('data-auto-submit') !== 'false';
+			const captureIP = container.getAttribute('data-capture-ip') === 'true';
+
+			const form = new FlintForm();
+			await form.init({
+				formId: formId || undefined,
+				autoSubmitToSupabase: autoSubmit,
+				captureIP: captureIP,
+			});
+		}
+	};
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', autoInit);
+	} else {
+		autoInit();
+	}
 }
 
 export { FlintForm };

@@ -12,16 +12,19 @@ export function DropdownField({ field, value, onChange, error, className }: Form
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
+  const totalOptions = field.options?.length || 0;
+  const showSearch = totalOptions > 5;
+
   // Filter options based on search query
   const filteredOptions = useMemo(() => {
-    if (!searchQuery.trim()) {
+    if (!searchQuery.trim() || !showSearch) {
       return field.options || [];
     }
     
     return (field.options || []).filter((option) =>
       option.label.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [field.options, searchQuery]);
+  }, [field.options, searchQuery, showSearch]);
 
   // Get selected option label
   const selectedOption = field.options?.find((opt) => opt.value === value);
@@ -65,25 +68,36 @@ export function DropdownField({ field, value, onChange, error, className }: Form
         
         <Select.Portal>
           <Select.Content
-            className="relative z-50 min-w-[var(--radix-select-trigger-width)] max-h-96 overflow-hidden rounded-md border bg-white text-gray-950 shadow-lg animate-in fade-in-80"
+            className={cn(
+              "relative z-50 min-w-[var(--radix-select-trigger-width)] max-h-96 overflow-hidden rounded-md border bg-white text-gray-950 shadow-lg",
+              "data-[state=open]:animate-in data-[state=closed]:animate-out",
+              "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+              "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+              "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+            )}
             position="popper"
             sideOffset={4}
+            align="start"
+            avoidCollisions={true}
           >
-            {/* Search Input */}
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-2">
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search options..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
+            {/* Conditional Search Input - Only show if more than 5 options */}
+            {showSearch && (
+              <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-2">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search options..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <Select.ScrollUpButton className="flex cursor-default items-center justify-center py-1 bg-white">
               <ChevronUpIcon />
@@ -95,7 +109,7 @@ export function DropdownField({ field, value, onChange, error, className }: Form
                   <Select.Item
                     key={option.id}
                     value={option.value}
-                    className="relative flex cursor-pointer select-none items-center rounded-sm py-2 px-3 text-sm outline-none focus:bg-blue-50 data-[state=checked]:bg-blue-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-gray-100"
+                    className="relative flex cursor-pointer select-none items-center rounded-sm py-2 px-3 text-sm outline-none focus:bg-blue-50 data-[state=checked]:bg-blue-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-gray-100 transition-colors"
                   >
                     <Select.ItemText>{option.label}</Select.ItemText>
                   </Select.Item>
