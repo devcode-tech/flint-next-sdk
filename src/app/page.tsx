@@ -16,6 +16,7 @@ export default function HomePage() {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('checking')
       
       console.log('Form submitted with data:', data);
       setSubmissionResult('Form submitted successfully!');
