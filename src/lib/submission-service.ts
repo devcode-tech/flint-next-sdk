@@ -7,14 +7,42 @@ interface SubmissionResult {
 	error?: string;
 }
 
+import { FormSchema } from './types';
+
 interface FormSchemaRow {
 	id: string;
 	form_id: string;
 }
 
+function sanitizeData(
+	data: FormData,
+	options?: { exclude?: string[] }
+): FormData {
+	const sanitizedData: FormData = {};
+	const excludeFields = options?.exclude || [];
+
+	for (const key in data) {
+		if (Object.prototype.hasOwnProperty.call(data, key)) {
+			const value = data[key];
+
+			if (excludeFields.includes(key)) {
+				sanitizedData[key] = value;
+				continue;
+			}
+
+			if (typeof value === 'string') {
+				sanitizedData[key] = value.replace(/[<>"']/g, '');
+			} else {
+				sanitizedData[key] = value;
+			}
+		}
+	}
+	return sanitizedData;
+}
+
 /**
  * Submit form data to Supabase
- * @param formId - The form_id (e.g., "B25DGW")
+ * @param schema - The full form schema object
  * @param data - The form data to submit
  * @param ipAddress - Optional IP address of the submitter
  * @returns SubmissionResult with success status and submission ID
@@ -25,16 +53,14 @@ export async function submitFormToSupabase(
 	ipAddress?: string
 ): Promise<SubmissionResult> {
 	try {
-		console.log('came to submitFormToSupabase');
-
 		const supabase = getSupabaseClient();
 
-		// First, get the UUID of the form_schema based on form_id
+		// 1. Get the UUID of the form_schema based on form_id
 		const { data: schemaData, error: schemaError } = await supabase
 			.from('form_schemas')
-			.select('id')
+			.select('id, schema') // The 'fields' are inside the 'schema' JSONB column
 			.eq('form_id', formId)
-			.single<FormSchemaRow>();
+			.single<{ id: string; schema: FormSchema }>();
 
 		if (schemaError || !schemaData) {
 			console.error('Error finding form schema:', schemaError);
@@ -44,19 +70,31 @@ export async function submitFormToSupabase(
 			};
 		}
 
-		// Insert the submission
+		// 2. Sanitize data before submission, excluding non-string fields
+		const fieldsToExclude = schemaData.schema.fields
+			.filter(
+				f =>
+					f.type === 'date' ||
+					f.type === 'file' ||
+					f.type === 'checkbox' ||
+					f.type === 'terms'
+			)
+			.map(f => f.name);
+		const sanitizedData = sanitizeData(data, { exclude: fieldsToExclude });
+
+		// 3. Insert the submission
 		const { data: submissionData, error: submissionError } = await supabase
 			.from('form_submissions')
 			.insert({
-				form_id: schemaData.id, // UUID from form_schemas table
-				data: data, // JSONB data
+				form_id: schemaData.id, // Use the fetched UUID
+				data: sanitizedData, // JSONB data
 				ip_address: ipAddress || null,
 			})
 			.select('id')
 			.single();
 
 		if (submissionError) {
-			console.error('Error submitting form:', submissionError);
+			console.error('Error inserting submission:', submissionError);
 			return {
 				success: false,
 				error: submissionError.message,
@@ -65,29 +103,13 @@ export async function submitFormToSupabase(
 
 		return {
 			success: true,
-			submissionId: submissionData?.id,
+			submissionId: submissionData.id,
 		};
-	} catch (error) {
-		console.error('Unexpected error during form submission:', error);
+	} catch (error: any) {
+		console.error('Unexpected error during submission:', error);
 		return {
 			success: false,
-			error: 'An unexpected error occurred',
+			error: error.message || 'An unexpected error occurred',
 		};
-	}
-}
-
-/**
- * Get client IP address (best effort in browser)
- * Note: This is not reliable in browser. Better to get from server-side.
- */
-export async function getClientIP(): Promise<string | null> {
-	try {
-		// Use a public IP API service
-		const response = await fetch('https://api.ipify.org?format=json');
-		const data = await response.json();
-		return data.ip || null;
-	} catch (error) {
-		console.warn('Could not fetch client IP:', error);
-		return null;
 	}
 }

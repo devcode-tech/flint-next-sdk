@@ -6,7 +6,8 @@ import type { FormData, FormSchema } from '@/lib/types';
 import formSchema from '@/app/page-schema';
 import { validateFormData, rateLimiter, sanitizeInput } from './security';
 import { fetchFormSchema } from './schema-service';
-import { submitFormToSupabase, getClientIP } from './submission-service';
+import { initializeSupabaseClient } from './supabase-client';
+import { submitFormToSupabase } from './submission-service';
 
 // Import bundled styles
 import './sdk-styles.css';
@@ -23,6 +24,8 @@ interface FlintFormConfig {
 	maxRetries?: number;
 	autoSubmitToSupabase?: boolean; // NEW: Auto-submit to Supabase (default: true if formId provided)
 	captureIP?: boolean; // NEW: Capture IP address for submissions (default: false)
+	supabaseUrl?: string; // Supabase project URL
+	supabaseAnonKey?: string; // Supabase anonymous key
 }
 
 class FlintForm {
@@ -45,7 +48,14 @@ class FlintForm {
 			maxRetries = 3,
 			autoSubmitToSupabase = formId ? true : false, // Auto-enable if formId provided
 			captureIP = false,
+			supabaseUrl,
+			supabaseAnonKey,
 		} = config || {};
+
+		// Initialize Supabase client if credentials are provided
+		if (supabaseUrl && supabaseAnonKey) {
+			initializeSupabaseClient(supabaseUrl, supabaseAnonKey);
+		}
 
 		this.config = {
 			containerId,
@@ -59,6 +69,8 @@ class FlintForm {
 			maxRetries,
 			autoSubmitToSupabase,
 			captureIP,
+			supabaseUrl,
+			supabaseAnonKey,
 		};
 
 		this.container = document.getElementById(containerId);
@@ -140,20 +152,14 @@ class FlintForm {
 					);
 				}
 
-				// Sanitize string inputs
-				const sanitizedData = this.sanitizeFormData(data);
-
 				// Handle submission based on configuration
 				if (autoSubmitToSupabase && formId) {
 					// Auto-submit to Supabase
 					let ipAddress: string | null = null;
-					if (captureIP) {
-						ipAddress = await getClientIP();
-					}
 
 					const result = await submitFormToSupabase(
 						formId,
-						sanitizedData,
+						data, // Pass the raw data
 						ipAddress || undefined
 					);
 
@@ -168,14 +174,13 @@ class FlintForm {
 
 					// Also call custom onSubmit if provided (for additional processing)
 					if (onSubmit) {
-						await onSubmit(sanitizedData);
+						await onSubmit(data);
 					}
 
 					alert('Form submitted successfully!');
 				} else if (onSubmit) {
 					// Use custom submit handler
-					console.log('✅ Using custom onSubmit handler');
-					await onSubmit(sanitizedData);
+					await onSubmit(data);
 					if (onSubmitSuccess) {
 						onSubmitSuccess();
 					}
@@ -195,6 +200,14 @@ class FlintForm {
 		if (!this.container) return;
 
 		this.root = ReactDOM.createRoot(this.container);
+
+		const supabaseConfig =
+			this.config && this.config.supabaseUrl && this.config.supabaseAnonKey
+				? {
+						url: this.config.supabaseUrl,
+						anonKey: this.config.supabaseAnonKey,
+				  }
+				: undefined;
 
 		const formElement = React.createElement(DynamicForm, {
 			schema: schema,
@@ -353,11 +366,20 @@ if (typeof window !== 'undefined') {
 			const autoSubmit = container.getAttribute('data-auto-submit') !== 'false';
 			const captureIP = container.getAttribute('data-capture-ip') === 'true';
 
+			// Get Supabase config from window object
+			const config = (window as any).FLINT_FORM_CONFIG || {};
+			const supabaseUrl =
+				config.NEXT_PUBLIC_SUPABASE_URL || config.SUPABASE_URL;
+			const supabaseAnonKey =
+				config.NEXT_PUBLIC_SUPABASE_ANON_KEY || config.SUPABASE_ANON_KEY;
+
 			const form = new FlintForm();
 			await form.init({
 				formId: formId || undefined,
 				autoSubmitToSupabase: autoSubmit,
 				captureIP: captureIP,
+				supabaseUrl: supabaseUrl,
+				supabaseAnonKey: supabaseAnonKey,
 			});
 		}
 	};

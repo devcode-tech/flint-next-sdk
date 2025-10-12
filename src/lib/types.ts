@@ -141,7 +141,7 @@ export type FormData = Record<string, any>;
 
 export interface FormFieldProps {
 	field: FormField;
-	value?: any;
+	value: any;
 	onChange: (value: any) => void;
 	onBlur?: () => void;
 	error?: string;

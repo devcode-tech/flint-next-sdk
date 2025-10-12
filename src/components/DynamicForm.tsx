@@ -240,11 +240,7 @@ export function DynamicForm({
 		}
 	};
 
-	const handleButtonClick = (e: React.MouseEvent) => {
-		console.log('🔘 Submit button clicked!');
-		console.log('🔘 Current form values:', watch());
-		console.log('🔘 Current errors:', errors);
-	};
+	const handleButtonClick = (e: React.MouseEvent) => {};
 
 	const submitButtonStyles = applyInlineStyles({
 		'background-color': schema.design['submit-button']['background-color'],
@@ -270,17 +266,9 @@ export function DynamicForm({
 	return (
 		<div className={cn('w-full', className)}>
 			<form
-				onSubmit={e => {
-					handleSubmit(
-						data => {
-							console.log('✅ Validation passed! Calling handleFormSubmit');
-							return handleFormSubmit(data);
-						},
-						errors => {
-							console.log('❌ Validation failed with errors:', errors);
-						}
-					)(e);
-				}}
+				onSubmit={handleSubmit(handleFormSubmit, errors => {
+					console.log('❌ Validation failed with errors:', errors);
+				})}
 				className={cn(
 					schema.design.padding,
 					schema.design['max-width'],
@@ -291,7 +279,6 @@ export function DynamicForm({
 				)}
 				style={containerStyles}
 			>
-				{/* Form Title */}
 				{schema.title && (
 					<div className="mb-8 text-center">
 						<h1 className="text-3xl font-bold text-gray-900">{schema.title}</h1>
@@ -301,7 +288,6 @@ export function DynamicForm({
 					</div>
 				)}
 
-				{/* Logo */}
 				{schema.design['logo-url'] && (
 					<div className="mb-8 text-center">
 						<img
@@ -312,10 +298,8 @@ export function DynamicForm({
 					</div>
 				)}
 
-				{/* Form Fields */}
 				<div className="flex flex-wrap -mx-2">
 					{visibleFields.map(field => {
-						// Skip fields without names (like text-only terms)
 						if (!field.name || !field.name.trim()) {
 							return (
 								<div key={field.id} className={cn(field.width, 'px-2 mb-6')}>
@@ -345,7 +329,6 @@ export function DynamicForm({
 					})}
 				</div>
 
-				{/* Submit Button */}
 				<div className={cn('flex mt-8', getSubmitButtonAlignment())}>
 					<button
 						type="submit"
